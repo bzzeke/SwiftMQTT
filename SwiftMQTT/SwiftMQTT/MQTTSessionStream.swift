@@ -17,10 +17,10 @@ protocol MQTTSessionStreamDelegate: class {
 class MQTTSessionStream: NSObject {
 
     private var currentRunLoop: RunLoop?
-    private var currentThread: Thread?
     private let inputStream: InputStream?
     private let outputStream: OutputStream?
     private var sessionQueue: DispatchQueue
+    private var exitThread = false
     private weak var delegate: MQTTSessionStreamDelegate?
 
     private var inputReady = false
@@ -49,7 +49,6 @@ class MQTTSessionStream: NSObject {
             }
 
             self.currentRunLoop = RunLoop.current
-            self.currentThread = Thread.current
 
             inputStream?.schedule(in: self.currentRunLoop!, forMode: .default)
             outputStream?.schedule(in: self.currentRunLoop!, forMode: .default)
@@ -66,11 +65,12 @@ class MQTTSessionStream: NSObject {
                     self.connectTimeout()
                 }
             }
-            var isCancelled = self.currentThread?.isCancelled ?? true
 
-            while !isCancelled && (self.currentRunLoop != nil && self.currentRunLoop!.run(mode: .default, before: Date.distantFuture)) {
-                isCancelled = self.currentThread?.isCancelled ?? true
-            }
+            repeat {
+                self.currentRunLoop?.run(mode: .default, before: Date.distantFuture)
+                print("looping")
+            } while (!self.exitThread)
+            print("MQ: exiting thread")
         }
     }
 
@@ -97,7 +97,8 @@ class MQTTSessionStream: NSObject {
     }
 
     func stopThread() {
-        currentThread?.cancel()
+        print("trying to stop thread")
+        exitThread = true
     }
 }
 
