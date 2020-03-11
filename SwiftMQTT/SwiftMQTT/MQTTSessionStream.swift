@@ -26,7 +26,7 @@ class MQTTSessionStream: NSObject {
     private var inputReady = false
     private var outputReady = false
 
-    init(host: String, port: UInt16, ssl: Bool, timeout: TimeInterval, delegate: MQTTSessionStreamDelegate?) {
+    init(host: String, port: UInt16, ssl: Bool, clientCertificates: NSArray?, timeout: TimeInterval, delegate: MQTTSessionStreamDelegate?) {
         var inputStream: InputStream?
         var outputStream: OutputStream?
         Stream.getStreamsToHost(withName: host, port: Int(port), inputStream: &inputStream, outputStream: &outputStream)
@@ -59,6 +59,14 @@ class MQTTSessionStream: NSObject {
                 let securityLevel = StreamSocketSecurityLevel.negotiatedSSL.rawValue
                 inputStream?.setProperty(securityLevel, forKey: .socketSecurityLevelKey)
                 outputStream?.setProperty(securityLevel, forKey: .socketSecurityLevelKey)
+
+                if let clientCertificates = clientCertificates {
+                    let settings: [NSObject: NSObject] = [
+                        kCFStreamSSLCertificates: clientCertificates
+                    ]
+                    inputStream?.setProperty(settings, forKey: kCFStreamPropertySSLSettings as Stream.PropertyKey)
+                    outputStream?.setProperty(settings, forKey: kCFStreamPropertySSLSettings as Stream.PropertyKey)
+                }
             }
             if timeout > 0 {
                 DispatchQueue.global().asyncAfter(deadline: .now() +  timeout) {

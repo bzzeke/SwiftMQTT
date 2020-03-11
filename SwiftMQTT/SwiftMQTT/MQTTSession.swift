@@ -17,12 +17,13 @@ public protocol MQTTSessionDelegate: class {
 public typealias MQTTSessionCompletionBlock = (_ error: MQTTSessionError) -> Void
 
 open class MQTTSession {
-	
+
     let host: String
     let port: UInt16
     let connectionTimeout: TimeInterval
     let useSSL: Bool
-    
+    let clientCertificates: NSArray?
+
     public let cleanSession: Bool
     public let keepAlive: UInt16
     public let clientID: String
@@ -38,9 +39,9 @@ open class MQTTSession {
     private var connectionCompletionBlock: MQTTSessionCompletionBlock?
     private var messagesCompletionBlocks = [UInt16: MQTTSessionCompletionBlock]()
     private var factory: MQTTPacketFactory
-    
+
     private var stream: MQTTSessionStream?
-    
+
     public init(
         host: String,
         port: UInt16,
@@ -48,23 +49,25 @@ open class MQTTSession {
         cleanSession: Bool,
         keepAlive: UInt16,
         connectionTimeout: TimeInterval = 5.0,
-        useSSL: Bool = false)
+        useSSL: Bool = false,
+        clientCertificates: NSArray? = nil)
     {
         self.factory = MQTTPacketFactory()
         self.host = host
         self.port = port
         self.connectionTimeout = connectionTimeout
         self.useSSL = useSSL
+        self.clientCertificates = clientCertificates
         self.clientID = clientID
         self.cleanSession = cleanSession
         self.keepAlive = keepAlive
     }
-    
+
     deinit {
         delegate = nil
         disconnect()
     }
-    
+
     open func publish(_ data: Data, in topic: String, delivering qos: MQTTQoS, retain: Bool, completion: MQTTSessionCompletionBlock?) {
         let msgID = nextMessageID()
         let pubMsg = MQTTPubMsg(topic: topic, payload: data, retain: retain, QoS: qos)
@@ -82,7 +85,7 @@ open class MQTTSession {
     open func subscribe(to topic: String, delivering qos: MQTTQoS, completion: MQTTSessionCompletionBlock?) {
         subscribe(to: [topic: qos], completion: completion)
     }
-    
+
     open func subscribe(to topics: [String: MQTTQoS], completion: MQTTSessionCompletionBlock?) {
         let msgID = nextMessageID()
         let subscribePacket = MQTTSubPacket(topics: topics, messageID: msgID)
@@ -96,7 +99,7 @@ open class MQTTSession {
     open func unSubscribe(from topic: String, completion: MQTTSessionCompletionBlock?) {
         unSubscribe(from: [topic], completion: completion)
     }
-    
+
     open func unSubscribe(from topics: [String], completion: MQTTSessionCompletionBlock?) {
         let msgID = nextMessageID()
         let unSubPacket = MQTTUnsubPacket(topics: topics, messageID: msgID)
@@ -106,10 +109,10 @@ open class MQTTSession {
             completion?(MQTTSessionError.socketError)
         }
     }
-    
+
     open func connect(completion: MQTTSessionCompletionBlock?) {
         connectionCompletionBlock = completion
-        stream = MQTTSessionStream(host: host, port: port, ssl: useSSL, timeout: connectionTimeout, delegate: self)
+        stream = MQTTSessionStream(host: host, port: port, ssl: useSSL, clientCertificates: clientCertificates, timeout: connectionTimeout, delegate: self)
     }
 
     open func disconnect() {
@@ -117,7 +120,7 @@ open class MQTTSession {
         send(disconnectPacket)
         cleanupDisconnection(.none)
     }
-    
+
     private func cleanupDisconnection(_ error: MQTTSessionError) {
         stream?.stopThread()
         stream = nil
@@ -138,7 +141,7 @@ open class MQTTSession {
         }
         return false
     }
-    
+
     private func handle(_ packet: MQTTPacket) {
 
         switch packet {
@@ -171,26 +174,26 @@ open class MQTTSession {
             return
         }
     }
-    
+
     private func sendPubAck(for messageId: UInt16) {
         let pubAck = MQTTPubAck(messageID: messageId)
         send(pubAck)
     }
-    
+
     private func callSuccessCompletionBlock(for messageId: UInt16) {
         delegateQueue.async { [weak self] in
             let completionBlock = self?.messagesCompletionBlocks.removeValue(forKey: messageId)
             completionBlock?(MQTTSessionError.none)
         }
     }
-    
+
     fileprivate func keepAliveTimerFired() {
         let mqttPingReq = MQTTPingPacket()
         send(mqttPingReq)
     }
-    
+
     private var messageID = UInt16(0)
-    
+
     private func nextMessageID() -> UInt16 {
         messageID += 1
         return messageID
@@ -198,7 +201,7 @@ open class MQTTSession {
 }
 
 extension MQTTSession: MQTTSessionStreamDelegate {
-    
+
     func mqttReady(_ ready: Bool, in stream: MQTTSessionStream) {
         if ready {
             // Create Connect Packet
@@ -235,7 +238,7 @@ extension MQTTSession: MQTTSessionStreamDelegate {
             handle(packet)
         }
     }
-    
+
     func mqttErrorOccurred(in stream: MQTTSessionStream, error: Error?) {
         cleanupDisconnection(.streamError(error))
     }
