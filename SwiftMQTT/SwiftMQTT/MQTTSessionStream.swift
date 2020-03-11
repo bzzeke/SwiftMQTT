@@ -76,9 +76,7 @@ class MQTTSessionStream: NSObject {
 
             repeat {
                 self.currentRunLoop?.run(mode: .default, before: Date.distantFuture)
-                print("looping")
             } while (!self.exitThread)
-            print("MQ: exiting thread")
         }
     }
 
@@ -105,7 +103,6 @@ class MQTTSessionStream: NSObject {
     }
 
     func stopThread() {
-        print("trying to stop thread")
         exitThread = true
     }
 }
