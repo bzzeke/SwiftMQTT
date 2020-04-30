@@ -34,8 +34,8 @@ enum MQTTPacketType: UInt8 {
 
 public enum MQTTQoS: UInt8 {
     case atMostOnce     = 0x0
-    case atLeastOnce    = 0x01
-    case exactlyOnce    = 0x02
+    case atLeastOnce    = 0x02
+    case exactlyOnce    = 0x04
 }
 
 public enum MQTTConnAckResponse: UInt8, Error {
